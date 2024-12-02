@@ -1,0 +1,238 @@
+### Folder Structure
+```plaintext
+project/
+├── static/
+│   ├── css/
+│   │   └── style.css
+├── templates/
+│   ├── base.html
+│   ├── index.html
+│   ├── prayer_request.html
+│   ├── testimony.html
+│   └── dashboard.html
+├── app.py
+└── database.db
+```
+
+### `app.py` - Flask Backend
+```python
+from flask import Flask, render_template, request, redirect, url_for, flash
+import sqlite3
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
+
+# Database setup
+DATABASE = 'database.db'
+
+def init_db():
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS prayer_requests (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT,
+                            message TEXT,
+                            anonymous INTEGER)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS testimonies (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT,
+                            message TEXT,
+                            anonymous INTEGER)''')
+
+init_db()
+
+# Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/prayer_request', methods=['GET', 'POST'])
+def prayer_request():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        message = request.form.get('message')
+        anonymous = 1 if request.form.get('anonymous') else 0
+
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO prayer_requests (name, message, anonymous) VALUES (?, ?, ?)', 
+                           (name, message, anonymous))
+            conn.commit()
+        flash('Your prayer request has been submitted successfully.')
+        return redirect(url_for('index'))
+
+    return render_template('prayer_request.html')
+
+@app.route('/testimony', methods=['GET', 'POST'])
+def testimony():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        message = request.form.get('message')
+        anonymous = 1 if request.form.get('anonymous') else 0
+
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO testimonies (name, message, anonymous) VALUES (?, ?, ?)', 
+                           (name, message, anonymous))
+            conn.commit()
+        flash('Your testimony has been shared successfully.')
+        return redirect(url_for('index'))
+
+    return render_template('testimony.html')
+
+@app.route('/dashboard')
+def dashboard():
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM prayer_requests')
+        prayer_requests = cursor.fetchall()
+        cursor.execute('SELECT * FROM testimonies')
+        testimonies = cursor.fetchall()
+    return render_template('dashboard.html', prayer_requests=prayer_requests, testimonies=testimonies)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+### HTML Templates
+
+#### `base.html` (Shared Layout)
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>GNAAS-KNUST</title>
+</head>
+<body>
+    <header>
+        <h1>GNAAS-KNUST Personal Ministry</h1>
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('prayer_request') }}">Submit Prayer Request</a>
+            <a href="{{ url_for('testimony') }}">Share Testimony</a>
+            <a href="{{ url_for('dashboard') }}">Admin Dashboard</a>
+        </nav>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
+```
+
+#### `index.html`
+```html
+{% extends 'base.html' %}
+{% block content %}
+<h2>Welcome to GNAAS-KNUST Personal Ministry</h2>
+<p>Submit your prayer requests and testimonies. Together, we grow in faith.</p>
+{% endblock %}
+```
+
+#### `prayer_request.html`
+```html
+{% extends 'base.html' %}
+{% block content %}
+<h2>Submit a Prayer Request</h2>
+<form method="POST">
+    <label>Name (optional):</label>
+    <input type="text" name="name">
+    <label>Message:</label>
+    <textarea name="message" required></textarea>
+    <label><input type="checkbox" name="anonymous"> Submit Anonymously</label>
+    <button type="submit">Submit</button>
+</form>
+{% endblock %}
+```
+
+#### `testimony.html`
+```html
+{% extends 'base.html' %}
+{% block content %}
+<h2>Share a Testimony</h2>
+<form method="POST">
+    <label>Name (optional):</label>
+    <input type="text" name="name">
+    <label>Message:</label>
+    <textarea name="message" required></textarea>
+    <label><input type="checkbox" name="anonymous"> Share Anonymously</label>
+    <button type="submit">Share</button>
+</form>
+{% endblock %}
+```
+
+#### `dashboard.html`
+```html
+{% extends 'base.html' %}
+{% block content %}
+<h2>Admin Dashboard</h2>
+<h3>Prayer Requests</h3>
+<ul>
+    {% for request in prayer_requests %}
+        <li>{{ request[2] }} - {{ 'Anonymous' if request[3] else request[1] }}</li>
+    {% endfor %}
+</ul>
+<h3>Testimonies</h3>
+<ul>
+    {% for testimony in testimonies %}
+        <li>{{ testimony[2] }} - {{ 'Anonymous' if testimony[3] else testimony[1] }}</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+```
+
+### `style.css` - Basic Styling
+```css
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background: #0055a5;
+    color: #fff;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+header nav a {
+    margin: 0 15px;
+    color: #fff;
+    text-decoration: none;
+}
+
+main {
+    padding: 20px;
+}
+
+form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+form label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+form input, form textarea, form button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+form button {
+    background: #0055a5;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+form button:hover {
+    background: #003f7f;
+}
